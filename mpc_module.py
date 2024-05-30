@@ -16,11 +16,12 @@ class SINGLE_MPC:
     MPC controller for a single vehicle
     """
     def __init__(self):
+        # controller parameters
         self.NX = 4  # Observation State, x = x, y, v, yaw
         self.NU = 2  # Controller Input, a = [accel, steer]
-        self.T = 5  # MPC horizon length
 
         # mpc parameters
+        self.T = 5  # MPC horizon length
         self.R = np.diag([0.1, 0.1])  # input cost matrix
         self.Rd = np.diag([0.1, 1.0])  # input difference cost matrix
         self.Q = np.diag([1.0, 1.0, 0.5, 1.0])  # state cost matrix
@@ -46,22 +47,26 @@ class SINGLE_MPC:
         self.WHEEL_WIDTH = 0.2  # [m]
         self.TREAD = 0.7  # [m]
         self.WB = 2.5  # [m]
-
         self.MAX_STEER = np.deg2rad(45.0)  # maximum steering angle [rad]
         self.MAX_DSTEER = np.deg2rad(30.0)  # maximum steering speed [rad/s]
         self.MAX_SPEED = 60.0 / 3.6  # maximum speed [m/s]
         self.MIN_SPEED = 0.0 / 3.6  # minimum speed [m/s]
         self.MAX_ACCEL = 1.0  # maximum accel [m/ss]
-
         self.XY_GOAL_TOLERANCE = self.GOAL_DIS # [m]
         self.DL = 1.0  # course tick [m]
 
+        # app parameters
         self.SHOW_ANIMATION = SHOW_ANIMATION
         self.SHOW_POTENTIAL_FIELD = True
         self.OBSTACLE_AVOIDANCE = True
 
 
     def pi_2_pi(self, angle):
+        '''
+        Description: Filter an angle within a range between [-pi, pi]
+        Input: angle [rad]
+        Output: andle [rad]
+        '''
         while(angle > math.pi):
             angle = angle - 2.0 * math.pi
 
@@ -80,20 +85,14 @@ class SINGLE_MPC:
             if(x[-1] == -1 and y[-1] == -1):
                 x.pop()
                 y.pop()
-
         # 为了计算曲率，确保waypoints长度为3
         while(len(x)<3):
             x.append(x[-1]+random.random())
             y.append(y[-1]+random.random())
-        # if(x[0]==-1 and y[0]==-1):
-        #     print('invalid trajectory')
-        #     return None, None
-        # else:
-        #     return x, y
+
         return x, y
 
     def get_linear_model_matrix(self, v, phi, delta):
-
         A = np.zeros((self.NX, self.NX))
         A[0, 0] = 1.0
         A[1, 1] = 1.0
@@ -104,11 +103,9 @@ class SINGLE_MPC:
         A[1, 2] = self.DT * math.sin(phi)
         A[1, 3] = self.DT * v * math.cos(phi)
         A[3, 2] = self.DT * math.tan(delta) / self.WB
-
         B = np.zeros((self.NX, self.NU))
         B[2, 0] = self.DT
         B[3, 1] = self.DT * v / (self.WB * math.cos(delta) ** 2)
-
         C = np.zeros(self.NX)
         C[0] = self.DT * v * math.sin(phi) * phi
         C[1] = - self.DT * v * math.cos(phi) * phi
@@ -198,21 +195,14 @@ class SINGLE_MPC:
 
 
     def calc_nearest_index(self, state, cx, cy, cyaw, pind):
-
         dx = [state.x - icx for icx in cx[pind:(pind + self.N_IND_SEARCH)]]
         dy = [state.y - icy for icy in cy[pind:(pind + self.N_IND_SEARCH)]]
-
         d = [idx ** 2 + idy ** 2 for (idx, idy) in zip(dx, dy)]
-
         mind = min(d)
-
         ind = d.index(mind) + pind
-
         mind = math.sqrt(mind)
-
         dxl = cx[ind] - state.x
         dyl = cy[ind] - state.y
-
         angle = self.pi_2_pi(cyaw[ind] - math.atan2(dyl, dxl))
         if angle < 0:
             mind *= -1
@@ -240,11 +230,9 @@ class SINGLE_MPC:
         """
         MPC contorl with updating operational point iteraitvely
         """
-
         if oa is None or od is None:
             oa = [0.0] * self.T
             od = [0.0] * self.T
-
         for i in range(self.MAX_ITER):
             xbar = self.predict_motion(x0, oa, od, xref)
             poa, pod = oa[:], od[:]

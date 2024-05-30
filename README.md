@@ -7,3 +7,7 @@ conda activate mpc
 pip install -r requirements.txt
 ```
 
+## Demo
+```sh
+python mpc_module.py
+```
